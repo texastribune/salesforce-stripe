@@ -30,8 +30,10 @@
             </slot>
           </td>
           <td>
-            <slot name="method" :method="payment.method">
-              {{ payment.method }}
+            <slot name="method" :payment="payment">
+              <template v-if="payment.card">
+                {{ payment.card.brand }} {{ payment.card.last4 }}
+              </template>
             </slot>
           </td>
           <td v-if="showReceipts">
@@ -47,14 +49,14 @@
         </tr>
       </tbody>
     </table>
-    <button
+
+    <base-button
       v-if="offset < payments.length"
-      class="c-button c-button--s has-bg-white has-box-shadow"
-      type="button"
-      @click="loadMore"
-    >
-      Load more
-    </button>
+      :display="{ size: 's', bg: 'white', color: 'black', isFullWidth: false }"
+      :extra-classes="['has-box-shadow']"
+      text="Load more"
+      @onClick="loadMore"
+    />
   </div>
 </template>
 

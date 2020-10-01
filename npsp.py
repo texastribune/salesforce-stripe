@@ -7,9 +7,10 @@ from decimal import Decimal
 from io import StringIO
 
 import requests
-from pytz import timezone
-
 from fuzzywuzzy import process
+from pytz import timezone
+from requests.adapters import HTTPAdapter
+from requests.packages.urllib3.util.retry import Retry
 
 ZONE = timezone(os.environ.get("TIMEZONE", "US/Central"))
 
@@ -27,9 +28,34 @@ TWOPLACES = Decimal(10) ** -2  # same as Decimal('0.01')
 # configured to use for opportunities on an RDO
 DEFAULT_RDO_TYPE = os.environ.get("DEFAULT_RDO_TYPE", "Membership")
 
+logging.getLogger("urllib3").setLevel(logging.DEBUG)
+
 
 class SalesforceException(Exception):
     pass
+
+
+def requests_retry_session(
+    retries=3,
+    backoff_factor=1,
+    status_forcelist=(400, 500, 502, 503, 504),
+    method_whitelist=False,
+    session=None,
+):
+    session = session or requests.Session()
+    retry = Retry(
+        total=retries,
+        status=retries,
+        read=retries,
+        connect=retries,
+        backoff_factor=backoff_factor,
+        method_whitelist=method_whitelist,
+        status_forcelist=status_forcelist,
+    )
+    adapter = HTTPAdapter(max_retries=retry)
+    session.mount("http://", adapter)
+    session.mount("https://", adapter)
+    return session
 
 
 class SalesforceConnection(object):
@@ -56,7 +82,7 @@ class SalesforceConnection(object):
 
     def _get_token(self):
 
-        r = requests.post(self.url, data=self.payload)
+        r = requests_retry_session().post(self.url, data=self.payload)
         self.check_response(r)
         response = json.loads(r.text)
 
@@ -255,6 +281,8 @@ class Opportunity(SalesforceObject):
 
         self.id = None
         self._amount = 0
+        self._net_amount = 0
+        self.donor_selected_amount = 0
         self.close_date = today
         self.campaign_id = None
         self.record_type_name = record_type_name
@@ -307,6 +335,8 @@ class Opportunity(SalesforceObject):
             SELECT
                 Id,
                 Amount,
+                Net_Amount__c,
+                Donor_Selected_Amount__c,
                 Name,
                 Stripe_Customer_ID__c,
                 Description,
@@ -340,6 +370,8 @@ class Opportunity(SalesforceObject):
             y.id = item["Id"]
             y.name = item["Name"]
             y.amount = item["Amount"]
+            y.net_amount = item["Net_Amount__c"]
+            y.donor_selected_amount = item["Donor_Selected_Amount__c"]
             y.stripe_customer = item["Stripe_Customer_ID__c"]
             y.description = item["Description"]
             y.agreed_to_pay_fees = item["Stripe_Agreed_to_pay_fees__c"]
@@ -373,10 +405,23 @@ class Opportunity(SalesforceObject):
     def amount(self, amount):
         self._amount = amount
 
+    @property
+    def net_amount(self):
+        net_amount = self._net_amount
+        if not self._net_amount:
+            net_amount = 0.0
+        return str(Decimal(net_amount).quantize(TWOPLACES))
+
+    @net_amount.setter
+    def net_amount(self, net_amount):
+        self._net_amount = net_amount
+
     def _format(self):
         return {
             "AccountId": self.account_id,
             "Amount": self.amount,
+            "Net_Amount__c": self.net_amount,
+            "Donor_Selected_Amount__c": self.donor_selected_amount,
             "CloseDate": self.close_date,
             "CampaignId": self.campaign_id,
             "RecordType": {"Name": self.record_type_name},

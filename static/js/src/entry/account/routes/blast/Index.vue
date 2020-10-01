@@ -1,59 +1,37 @@
 <template>
-  <route-loader v-if="routeIsFetching">
-    <template v-slot:text
-      >Grabbing your Blast information</template
+  <div>
+    <h1
+      class="has-ump-top-padding has-xl-btm-marg has-ump-side-padding t-size-xl"
     >
-  </route-loader>
-
-  <div v-else class="has-ump-top-padding">
-    <h1 class="has-xl-btm-marg has-ump-side-padding t-size-xl">
       The Blast Newsletter
     </h1>
 
-    <div class="has-ump-side-padding has-xl-btm-marg"><blast-detail /></div>
+    <div class="has-ump-side-padding has-xl-btm-marg">
+      <current /> <former />
+    </div>
 
-    <help blast :display="{ hasTopPadding: true }" />
+    <contact-us :ga-label="ga.userPortal.labels.blast" is-blast>
+      <template v-slot:text>
+        To update your subscription to The Blast, contact us at
+      </template>
+    </contact-us>
   </div>
 </template>
 
 <script>
-/* eslint-disable camelcase */
+import userMixin from '../../store/user/mixin';
+import routeMixin from '../mixin';
 
-import routeMixin from '../../mixins/route';
-import userMixin from '../home/mixins/user';
-import RouteLoader from '../home/components/RouteLoader.vue';
-import Help from '../../components/Help.vue';
-import BlastDetail from './containers/BlastDetailContainer.vue';
-import { InvalidRouteError } from '../../errors';
+import Current from './containers/CurrentContainer.vue';
+import Former from './containers/FormerContainer.vue';
+
+import ContactUs from '../../components/ContactUs.vue';
 
 export default {
   name: 'BlastRoute',
 
-  components: { Help, BlastDetail, RouteLoader },
+  components: { ContactUs, Current, Former },
 
   mixins: [routeMixin, userMixin],
-
-  computed: {
-    route() {
-      return {
-        isExact: true,
-        isProtected: false,
-        title: 'The Blast',
-      };
-    },
-  },
-
-  methods: {
-    async fetchData() {
-      const {
-        is_former_blast_subscriber,
-        is_current_blast_subscriber,
-      } = this.user;
-      const meetsCriteria =
-        is_former_blast_subscriber || is_current_blast_subscriber;
-
-      if (!meetsCriteria) throw new InvalidRouteError();
-    },
-  },
 };
 </script>

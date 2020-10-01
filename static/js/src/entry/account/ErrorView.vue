@@ -1,35 +1,82 @@
 <template>
   <div>
-    <nav-bar :show-route-links="false" />
+    <basic-nav-bar />
+
     <main class="l-minimal has-bg-white-off has-xl-padding">
-      <div class="l-minimal__content t-linkstyle--underlined">
-        <h1 class="has-xl-btm-marg">Sorry about that.</h1>
-        <p class="has-s-btm-marg t-space-heading-m">
-          We’re having trouble loading your account information, and we're
-          working hard to fix it.
+      <div class="l-minimal__content">
+        <h1 class="has-xl-btm-marg">
+          <template v-if="isUnverifiedError">
+            Please verify your account.
+          </template>
+          <template v-else>
+            Sorry about that.
+          </template>
+        </h1>
+
+        <p class="has-s-btm-marg t-links-underlined t-size-b">
+          <template v-if="isUnverifiedError">
+            Thanks for creating a Texas Tribune account &mdash; you’re almost
+            done! To view your account, we need you to verify your email
+            address: <strong>{{ user.email }}</strong
+            >. Check your inbox for an email from The Texas Tribune with the
+            subject line &quot;Please confirm your account,&quot; then click to
+            verify your email.
+          </template>
+          <template v-else>
+            We’re having trouble loading your account information, and we're
+            working hard to fix it. Click here to return to your
+            <a href="/account/">account overview</a>.
+          </template>
         </p>
-        <p class="t-space-heading-m">
-          Click here to return to your <a href="/account">account overview</a>.
-          If the issue persists, contact us at
-          <a
-            href="mailto:community@texastribune.org?subject=account%20technical%20error"
-            >community@texastribune.org</a
-          >.
-        </p>
+
+        <contact-us :ga-label="gaLabel" :display="{ color: 'black' }">
+          <template v-slot:text>
+            Having trouble? Contact
+          </template>
+        </contact-us>
       </div>
     </main>
-    <site-footer :show-route-links="false" />
+
+    <basic-site-footer />
   </div>
 </template>
 
 <script>
+import contextMixin from './store/context/mixin';
+import userMixin from './store/user/mixin';
+
+import ContactUs from './components/ContactUsSmall.vue';
+
+import setTitle from './utils/set-title';
+
+import { UnverifiedError } from './errors';
+
 export default {
   name: 'ErrorView',
+
+  components: { ContactUs },
+
+  mixins: [contextMixin, userMixin],
+
+  computed: {
+    isUnverifiedError() {
+      return this.context.error instanceof UnverifiedError;
+    },
+
+    gaLabel() {
+      if (this.isUnverifiedError) {
+        return this.ga.userPortal.labels.unverified;
+      }
+      return this.ga.userPortal.labels.error;
+    },
+  },
 
   mounted() {
     window.onpopstate = () => {
       window.location.reload();
     };
+
+    setTitle('Error');
   },
 };
 </script>

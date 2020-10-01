@@ -78,6 +78,14 @@ SENTRY_DSN = os.getenv("SENTRY_DSN")
 SENTRY_ENVIRONMENT = os.getenv("SENTRY_ENVIRONMENT", "unknown")
 REPORT_URI = os.getenv("REPORT_URI")
 
+########
+# Recaptcha
+#
+RECAPTCHA_KEYS = {
+    "secret_key": os.getenv("RECAPTCHA_SECRET_KEY"),
+    "site_key": os.getenv("RECAPTCHA_SITE_KEY"),
+}
+
 #######
 # Portal
 #
@@ -96,3 +104,6 @@ AMAZON_CAMPAIGN_ID = os.getenv("AMAZON_CAMPAIGN_ID", "")
 #
 # this is User.username
 CIRCLE_FAILURE_RECIPIENT = os.getenv("CIRCLE_FAILURE_RECIPIENT")
+
+CELERYD_LOG_FORMAT = "%(levelname)s %(name)s/%(module)s:%(lineno)d - %(message)s"
+CELERYD_TASK_LOG_FORMAT = "%(levelname)s %(name)s/%(module)s:%(lineno)d - %(message)s"

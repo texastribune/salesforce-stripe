@@ -9,30 +9,16 @@
 {% endblock %}
 
 {% block content %}
+  {% include "includes/thermometer.html" %}
 
-  <!-- {# include 'includes/thermometer.html' #} -->
-
-  <section class="splash splash--tall grid_separator">
+  <section class="splash splash--tall grid_separator--l">
     <div class="grid_container grid_padded--xl">
       <div class="grid_row grid_wrap--l">
         <div class="col_12">
           <h1 class="splash__headline">
-            Texas Tribune members
-            <br />
-            support our&nbsp;
-            <span class="rotate-words">
-              <span>journalism.</span>
-              <span>events.</span>
-              <span>community.</span>
-              <span>mission.</span>
-            </span>
+            <span class="has-text-yellow">Readers like you</span> make our public-service journalism possible.
           </h1>
-        </div>
-      </div>
-      <div class="splash__actions grid_row grid_wrap--l">
-        <div class="col_8">
-          <p class="splash__description grid_separator">Do you value credible, nonpartisan, public-interest journalism?</p>
-          <a class="button button--yellow grid_separator" href="#join-today" ga-event-category="donations" ga-event-action="membership-intent" ga-event-label="support landing">Show Your Support</a>
+          <p class="splash__description">Thanks to our members, every story we publish is free for all to access. Donate to our nonprofit newsroom by Sept. 30 and <a href="https://personalinjurylawyersaustintx.com/">Loewy Law Firm</a> will <strong>triple your impact</strong> by matching up to $50,000 in donations and gifting a second $50,000 match to our partners at <a href="https://www.centraltexasfoodbank.org/">Central Texas Food Bank</a>.</p>
         </div>
       </div>
     </div>
@@ -42,16 +28,17 @@
     <section class="grid_container grid_padded--xl grid_separator--xl">
       <div class="grid_row grid_wrap--l">
         <div class="col_8">
-          <div class="member_benefits section-padding">
-            {% include 'includes/benefits.html' %}
-          </div>
-          <div id="join-today" class="donation_form section-padding">
+          <div id="join-today" class="donation_form grid_separator--l">
             <!-- where the router component attaches -->
             <div id="app" style="display:none;"></div>
-            <div class="border--yellow_notch"></div>
-            <h2 class="grid_separator">Become a Texas Tribune Member today</h2>
+            <h2 class="grid_separator link--teal">Become a Texas Tribune Member today</h2>
             <!-- where the form attaches -->
             <div id="top-form"></div>
+            <div class="grid_separator"></div>
+            <p class="t-size-xs has-text-gray-dark"><strong>You can also give via <a href='https://www.paypal.me/texastribune'><img src="https://www.paypalobjects.com/webstatic/en_US/i/buttons/PP_logo_h_100x26.png" alt="PayPal" width="70" height="18" class="l-display-ib" style="vertical-align: middle; margin-left: 3px;"></strong></a></p>
+          </div>
+          <div class="member_benefits section-padding">
+            {% include 'includes/benefits.html' %}
           </div>
         </div>
         <div class="col_1"></div>
@@ -69,16 +56,22 @@
 {% endblock %}
 
 {% block bottom_script %}
-<script src="https://js.stripe.com/v3/"></script>
+  <script>
+    window.__STRIPE_KEY__ = '{{ stripe }}';
+    window.__RECAPTCHA_KEY__ = '{{ recaptcha }}';
+  </script>
 
-{% if form_data and message %}
-<script>
-  window.__TOP_FORM_SERVER_ERROR_MESSAGE__ = {{ message|tojson }};
-  window.__BASE_FORM_REHYDRATION__ = {{ form_data|tojson }};
-</script>
-{% endif %}
+  {% if form_data and message %}
+  <script>
+    window.__TOP_FORM_SERVER_ERROR_MESSAGE__ = {{ message|tojson }};
+    window.__BASE_FORM_REHYDRATION__ = {{ form_data|tojson }};
+  </script>
+  {% endif %}
 
-{% for script in bundles['js'] %}
-  <script src="{{ script }}"></script>
-{% endfor %}
+  <script src="https://js.stripe.com/v3/"></script>
+  <script src="https://www.google.com/recaptcha/api.js?render={{ recaptcha }}"></script>
+
+  {% for script in bundles['js'] %}
+    <script src="{{ script }}"></script>
+  {% endfor %}
 {% endblock %}

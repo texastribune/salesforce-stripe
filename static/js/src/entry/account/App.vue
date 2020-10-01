@@ -1,40 +1,47 @@
 <template>
   <div>
     <transition name="has-fade">
-      <app-loader v-show="appIsFetching" />
+      <app-loader v-show="showLoader" />
     </transition>
 
-    <error-view v-if="error" />
-    <unverified-view v-else-if="isUnverified" />
-    <router-view v-else :parent-route-is-fetching="false" />
+    <error-view v-if="showError" />
+    <router-view v-else />
   </div>
 </template>
 
 <script>
+import contextMixin from './store/context/mixin';
+
 import ErrorView from './ErrorView.vue';
-import UnverifiedView from './UnverifiedView.vue';
-import contextMixin from './mixins/context';
-import { UnverifiedError } from './errors';
+import AppLoader from './components/AppLoader.vue';
+
+import logError from './utils/log-error';
+
+import { CONTEXT_TYPES } from './store/types';
 
 export default {
   name: 'App',
 
-  components: { ErrorView, UnverifiedView },
+  components: { ErrorView, AppLoader },
 
   mixins: [contextMixin],
 
-  data() {
-    return { error: null, isUnverified: false };
+  computed: {
+    showLoader() {
+      return this.context.isFetching && !this.context.error;
+    },
+
+    showError() {
+      return !!this.context.error;
+    },
   },
 
   errorCaptured(err) {
-    this.setAppIsFetching(false);
+    this[CONTEXT_TYPES.setError](err);
 
-    if (err instanceof UnverifiedError) {
-      this.isUnverified = true;
-    } else {
-      this.error = err;
-    }
+    logError({ err });
+
+    return false;
   },
 };
 </script>

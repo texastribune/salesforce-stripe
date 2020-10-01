@@ -18,6 +18,9 @@ interactive: build backing
 		--link=redis:redis \
 		--name=${APP} ${NS}/${APP}:dev bash
 
+down:
+	docker rm -f ${APP} rabbitmq redis
+
 build:
 	docker build -f Dockerfile --tag=${NS}/${APP}:dev .
 
@@ -46,7 +49,7 @@ restart:
 	-pkill celery
 	-pkill python
 	C_FORCE_ROOT=True celery -A app.celery worker --without-heartbeat --without-gossip --without-mingle --loglevel=${LOG_LEVEL} &
-	python3 app.py & yarn run dev
+	python3 app.py & npm run dev
 
 celery-restart:
 	-pkill celery

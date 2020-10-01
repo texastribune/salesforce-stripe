@@ -7,6 +7,7 @@
     <meta charset="utf-8">
     <meta content="IE=edge,chrome=1" http-equiv="X-UA-Compatible">
     <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="description" content="The Texas Tribune’s nonprofit newsroom membership and donations page.">
     <link rel="shortcut icon" type="image/x-icon" href="{{ url_for('static', filename='img/favicon.ico') }}">
 
     {% block og_meta %}
@@ -42,16 +43,6 @@
     </script>
 
     {% block adwords_conversion_code %}{% endblock %}
-
-    <script src="https://ajax.googleapis.com/ajax/libs/webfont/1.6.16/webfont.js"></script>
-    <script>
-      WebFont.load({
-        google: {
-          families: ['Open Sans:400,700', 'PT Serif:400,700']
-        }
-      });
-    </script>
-
     {% block head_scripts %}{% endblock %}
   </head>
   <body>
@@ -66,15 +57,11 @@
       </div>
     {% endblock %}
 
-    {% include 'includes/navbar_thin.html' %}
+    {% include 'includes/navbar.html' %}
 
     {% block content %}{% endblock %}
 
     {% include 'includes/footer.html' %}
-
-    <script>
-      window.__STRIPE_KEY__ = '{{ key }}';
-    </script>
 
     {% block bottom_script %}{% endblock %}
   </body>

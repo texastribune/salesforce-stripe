@@ -1,5 +1,17 @@
-import { captureException } from '@sentry/browser';
+import { captureException, withScope } from '@sentry/browser';
 
-export default function logError(err, level = 'error') {
-  captureException(err, level);
+import { AxiosError } from '../errors';
+
+export default function logError({ err, level = 'error' }) {
+  withScope(scope => {
+    if (err.extra) {
+      scope.setExtra('extra', err.extra);
+    }
+
+    if (err instanceof AxiosError) {
+      scope.setExtra('status', err.status);
+    }
+
+    captureException(err, level);
+  });
 }

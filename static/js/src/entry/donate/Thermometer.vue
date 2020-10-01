@@ -8,8 +8,8 @@
       ></div>
     </div>
     <div class="text">
-      <strong>{{ data[0].label }}</strong> toward <br />
-      a goal of {{ data[1].label }}.
+      <strong>{{ data[0].label }} new members</strong> <br />
+      toward goal of {{ data[1].label }}.
     </div>
   </div>
 </template>
@@ -26,7 +26,7 @@ export default {
       error: false,
       data: [
         { slug: 'actual', label: '0', value: 0 },
-        { slug: 'goal', label: '$35,000', value: 35000 },
+        { slug: 'goal', label: '750', value: 750 },
       ],
     };
   },
@@ -43,7 +43,7 @@ export default {
 
   methods: {
     getSalesforceReport() {
-      const url = 'https://membership.texastribune.org/border2019.json';
+      const url = 'https://membership.texastribune.org/fmd2020.json';
 
       axios
         .get(url)

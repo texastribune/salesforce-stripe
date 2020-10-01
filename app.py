@@ -53,9 +53,10 @@ from util import (
     notify_slack,
     send_email_new_business_membership,
     send_multiple_account_warning,
+    send_slack_message,
 )
 from validate_email import validate_email
-from charges import charge
+from charges import charge, ChargeException
 
 ZONE = timezone(TIMEZONE)
 
@@ -317,9 +318,12 @@ def add_donation(form=None, customer=None, donation_type=None):
     if period is None:
         logging.info("----Creating one time payment...")
         opportunity = add_opportunity(contact=contact, form=form, customer=customer)
-        charge(opportunity)
-        logging.info(opportunity)
-        notify_slack(contact=contact, opportunity=opportunity)
+        try:
+            charge(opportunity)
+            logging.info(opportunity)
+            notify_slack(contact=contact, opportunity=opportunity)
+        except ChargeException as e:
+            e.send_slack_notification()
         return True
 
     elif donation_type == "circle":
@@ -337,37 +341,44 @@ def add_donation(form=None, customer=None, donation_type=None):
         for opportunity in opportunities
         if opportunity.expected_giving_date == today
     ][0]
-    charge(opp)
-    logging.info(rdo)
-    notify_slack(contact=contact, rdo=rdo)
+    try:
+        charge(opp)
+        logging.info(rdo)
+        notify_slack(contact=contact, rdo=rdo)
+    except ChargeException as e:
+        e.send_slack_notification()
     return True
 
 
-def do_charge_or_show_errors(template, bundles, function, donation_type):
+def do_charge_or_show_errors(form_data, template, bundles, function, donation_type):
     app.logger.debug("----Creating Stripe customer...")
 
-    email = request.form["stripeEmail"]
-    installment_period = request.form["installment_period"]
-    amount = request.form["amount"]
+    email = form_data["stripeEmail"]
+    installment_period = form_data["installment_period"]
+    amount = form_data["amount"]
+    stripe_token = form_data["stripeToken"]
 
     try:
-        customer = stripe.Customer.create(email=email, card=request.form["stripeToken"])
+        customer = stripe.Customer.create(email=email, card=stripe_token)
     except stripe.error.CardError as e:
         body = e.json_body
         err = body.get("error", {})
         message = err.get("message", "")
-        form_data = request.form.to_dict()
+        # at this point, amount has been converted to a float
+        # bring it back to a string for the rehydration of the form
+        form_data["amount"] = str(form_data["amount"])
         del form_data["stripeToken"]
 
         return render_template(
             template,
             bundles=bundles,
-            key=app.config["STRIPE_KEYS"]["publishable_key"],
+            stripe=app.config["STRIPE_KEYS"]["publishable_key"],
+            recaptcha=app.config["RECAPTCHA_KEYS"]["site_key"],
             message=message,
             form_data=form_data,
         )
     app.logger.info(f"Customer id: {customer.id}")
-    function(customer=customer, form=clean(request.form), donation_type=donation_type)
+    function(customer=customer, form=clean(form_data), donation_type=donation_type)
     gtm = {
         "event_value": amount,
         "event_label": "once" if installment_period == "None" else installment_period,
@@ -379,6 +390,12 @@ def validate_form(FormType, bundles, template, function=add_donation.delay):
     app.logger.info(pformat(request.form))
 
     form = FormType(request.form)
+    # use form.data instead of request.form from here on out
+    # because it includes all filters applied by WTF Forms
+    form_data = form.data
+    form_errors = form.errors
+    email = form_data["stripeEmail"]
+
     if FormType is DonateForm:
         donation_type = "membership"
     elif FormType is CircleForm:
@@ -390,21 +407,20 @@ def validate_form(FormType, bundles, template, function=add_donation.delay):
     else:
         raise Exception("Unrecognized form type")
 
-    email = request.form["stripeEmail"]
-
     if not validate_email(email):
         message = "There was an issue saving your email address."
         return render_template(
             "error.html", message=message, bundles=get_bundles("old")
         )
     if not form.validate():
-        app.logger.error(f"Form validation errors: {form.errors}")
+        app.logger.error(f"Form validation errors: {form_errors}")
         message = "There was an issue saving your donation information."
         return render_template(
             "error.html", message=message, bundles=get_bundles("old")
         )
 
     return do_charge_or_show_errors(
+        form_data=form_data,
         bundles=bundles,
         template=template,
         function=function,
@@ -435,7 +451,10 @@ def donate_form():
         return validate_form(DonateForm, bundles=bundles, template=template)
 
     return render_template(
-        template, bundles=bundles, key=app.config["STRIPE_KEYS"]["publishable_key"]
+        template,
+        bundles=bundles,
+        stripe=app.config["STRIPE_KEYS"]["publishable_key"],
+        recaptcha=app.config["RECAPTCHA_KEYS"]["site_key"],
     )
 
 
@@ -448,7 +467,10 @@ def circle_form():
         return validate_form(CircleForm, bundles=bundles, template=template)
 
     return render_template(
-        template, bundles=bundles, key=app.config["STRIPE_KEYS"]["publishable_key"]
+        template,
+        bundles=bundles,
+        stripe=app.config["STRIPE_KEYS"]["publishable_key"],
+        recaptcha=app.config["RECAPTCHA_KEYS"]["site_key"],
     )
 
 
@@ -466,7 +488,10 @@ def business_form():
         )
 
     return render_template(
-        template, bundles=bundles, key=app.config["STRIPE_KEYS"]["publishable_key"]
+        template,
+        bundles=bundles,
+        stripe=app.config["STRIPE_KEYS"]["publishable_key"],
+        recaptcha=app.config["RECAPTCHA_KEYS"]["site_key"],
     )
 
 
@@ -987,8 +1012,11 @@ def add_business_membership(
         for opportunity in opportunities
         if opportunity.expected_giving_date == today
     ][0]
-    charge(opp)
-    notify_slack(account=account, contact=contact, rdo=rdo)
+    try:
+        charge(opp)
+        notify_slack(account=account, contact=contact, rdo=rdo)
+    except ChargeException as e:
+        e.send_slack_notification()
 
     logging.info("----Getting affiliation...")
 
@@ -1060,7 +1088,11 @@ def add_blast_subscription(form=None, customer=None):
         for opportunity in opportunities
         if opportunity.expected_giving_date == today
     ][0]
-    charge(opp)
+    try:
+        charge(opp)
+    except ChargeException:
+        # TODO should we alert slack? Did not because we had no notifications here before.
+        pass
 
     return True
 

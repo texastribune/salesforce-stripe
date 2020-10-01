@@ -1,59 +1,40 @@
 <template>
-  <route-loader v-if="routeIsFetching">
-    <template v-slot:text
-      >Grabbing your Blast payment history</template
+  <div>
+    <h1
+      class="has-ump-top-padding has-ump-side-padding has-l-btm-marg t-size-xl"
     >
-  </route-loader>
-
-  <div v-else class="has-ump-top-padding">
-    <h1 class="has-l-btm-marg has-ump-side-padding t-size-xl">
       The Blast Newsletter: Payment History
     </h1>
 
-    <div class="has-ump-side-padding has-xxl-btm-marg"><blast-payments /></div>
+    <div class="has-ump-side-padding has-xxl-btm-marg">
+      <section class="c-detail-box c-detail-box--from-l">
+        <div class="has-xxxl-btm-marg"><detail /></div>
+        <internal-nav />
+      </section>
+    </div>
 
-    <help blast-payments :display="{ hasTopPadding: true }" />
+    <contact-us :ga-label="ga.userPortal.labels['blast-payments']" is-blast>
+      <template v-slot:text>
+        To update your subscription to The Blast, contact us at
+      </template>
+    </contact-us>
   </div>
 </template>
 
 <script>
-/* eslint-disable camelcase */
+import routeMixin from '../mixin';
 
-import routeMixin from '../../mixins/route';
-import userMixin from '../home/mixins/user';
-import Help from '../../components/Help.vue';
-import RouteLoader from '../home/components/RouteLoader.vue';
-import BlastPayments from './containers/BlastPaymentsContainer.vue';
-import { InvalidRouteError } from '../../errors';
+import userMixin from '../../store/user/mixin';
+
+import ContactUs from '../../components/ContactUs.vue';
+import Detail from './components/Detail.vue';
+import InternalNav from './components/InternalNav.vue';
 
 export default {
   name: 'BlastPaymentsRoute',
 
-  components: { Help, BlastPayments, RouteLoader },
+  components: { ContactUs, Detail, InternalNav },
 
   mixins: [routeMixin, userMixin],
-
-  computed: {
-    route() {
-      return {
-        isExact: true,
-        isProtected: false,
-        title: 'The Blast Payment History',
-      };
-    },
-  },
-
-  methods: {
-    async fetchData() {
-      const {
-        is_former_blast_subscriber,
-        is_current_blast_subscriber,
-      } = this.user;
-      const meetsCriteria =
-        is_former_blast_subscriber || is_current_blast_subscriber;
-
-      if (!meetsCriteria) throw new InvalidRouteError();
-    },
-  },
 };
 </script>

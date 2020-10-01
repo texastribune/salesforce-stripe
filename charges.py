@@ -12,6 +12,22 @@ stripe.api_key = STRIPE_KEYS["secret_key"]
 TWOPLACES = Decimal(10) ** -2  # same as Decimal('0.01')
 
 
+class ChargeException(Exception):
+    def __init__(self, opportunity, message):
+        super().__init__(message)
+        self.opportunity = opportunity
+        self.message = message
+
+    def send_slack_notification(self):
+        send_slack_message(
+            {
+                "channel": "#stripe",
+                "text": f"Charge failed for {self.opportunity.name} [{self.message}]",
+                "icon_emoji": ":x:",
+            }
+        )
+
+
 def amount_to_charge(opportunity):
     """
     Determine the amount to charge. This depends on whether the payer agreed
@@ -32,6 +48,35 @@ def quantize(amount):
     return Decimal(amount).quantize(TWOPLACES)
 
 
+def generate_stripe_description(opportunity) -> str:
+    """
+    Our current code populates the Description field of recurring donations 
+    and opportunities when those are created. Those descriptions get passed 
+    on to Stripe when the card is charged. But we have at least two cases 
+    where the Description field could be blank: when someone manually enters 
+    a donation or when it's a donation that's been migrated from our legacy 
+    (Tinypass) system. But in those cases we know the opportunity type and 
+    it's a direct relationship to the description so we can populate it anyway.
+    """
+    # remove leading "The " from descriptions for better Stripe
+    if opportunity.description:
+        if opportunity.description.startswith("The "):
+            return opportunity.description[4:]
+        else:
+            return opportunity.description
+
+    description_map = {
+        "The Blast": "Blast Subscription",
+        "Recurring Donation": "Texas Tribune Sustaining Membership",
+        "Single": "Texas Tribune Membership",
+        "Giving Circle": "Texas Tribune Circle Membership",
+    }
+    if opportunity.type in description_map.keys():
+        return description_map[opportunity.type]
+    else:
+        return "Texas Tribune"
+
+
 def charge(opportunity):
 
     amount = amount_to_charge(opportunity)
@@ -41,24 +86,41 @@ def charge(opportunity):
     if opportunity.stage_name != "Pledged":
         raise Exception(f"Opportunity {opportunity.id} is not Pledged")
 
+    opportunity.stage_name = "In Process"
+    opportunity.save()
+
     try:
         card_charge = stripe.Charge.create(
             customer=opportunity.stripe_customer,
             amount=int(amount * 100),
             currency="usd",
-            description=opportunity.description,
+            description=generate_stripe_description(opportunity),
             metadata={
                 "opportunity_id": opportunity.id,
                 "account_id": opportunity.account_id,
             },
         )
-    except stripe.error.CardError as e:
-        # look for decline code:
-        error = e.json_body["error"]
-        logging.info(f"The card has been declined:")
-        logging.info(f"Message: {error.get('message', '')}")
-        logging.info(f"Decline code: {error.get('decline_code', '')}")
-        opportunity.closed_lost_reason = error.get("message", "unknown failure")
+    except Exception as e:
+        logging.info(f"Error charging card: {type(e)}")
+        if isinstance(e, stripe.error.StripeError):
+            message = e.user_message or ''
+            logging.info(f"Message: {message}")
+
+            reason = e.user_message
+
+            if isinstance(e, stripe.error.CardError):
+                logging.info(f"The card has been declined")
+                logging.info(f"Decline code: {e.json_body.get('decline_code', '')}")
+
+                if reason is None:
+                    reason = "card declined for unknown reason"
+
+            if reason is None:
+                    reason = "unknown failure"
+        else:
+            reason = "unknown failure"
+
+        opportunity.closed_lost_reason = reason
         opportunity.stage_name = "Closed Lost"
         opportunity.save()
         logging.debug(
@@ -76,21 +138,33 @@ def charge(opportunity):
                     "icon_emoji": ":x:",
                 }
             )
-        return
 
-    except stripe.error.InvalidRequestError as e:
-        logging.error(f"Problem: {e}")
-        # TODO should we raise this?
-        return
-    except Exception as e:
-        logging.error(f"Problem: {e}")
-        # TODO should we raise this?
-        return
+        raise ChargeException(opportunity, reason)
+
 
     if card_charge.status != "succeeded":
         logging.error("Charge failed. Check Stripe logs.")
-        # TODO should we raise this?
-        return
+        raise ChargeException(opportunity, "charge failed")
+
+    # There's a lot going on here. Up to this point the donor selected an
+    # amount (say $100) and decided if they wanted to pay our processing
+    # fees. We recorded those two bits of information in the opportunity or the
+    # RDO. Now we're actually charging the card so we have new information:
+    # what the actual processing fees. So we we move stuff around. The
+    # original amount the donor selected was stored in the "amount" field of
+    # the opportunity or the RDO. That amount gets moved to "donor selected
+    # amount" on the opportunity. Now the amount field on the opportunity will
+    # represeent the gross amount (the point of this whole thing) and the
+    # amount minus processing fees gets stored on the opportunity field in "net
+    # amount". We didn't know that amount up until the charge took place
+    # because Amex.
+    balance_transaction = stripe.BalanceTransaction.retrieve(
+        card_charge.balance_transaction
+    )
+    opportunity.donor_selected_amount = opportunity.amount
+    opportunity.net_amount = balance_transaction.net / 100
+    opportunity.amount = amount  # gross
+    gross = card_charge.amount / 100
 
     opportunity.stripe_card = card_charge.source.id
     opportunity.stripe_transaction_id = card_charge.id

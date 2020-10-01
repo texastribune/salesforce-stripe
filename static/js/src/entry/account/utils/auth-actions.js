@@ -1,56 +1,48 @@
 import auth from './auth';
+
 import {
-  LOGGED_IN_FLAG_KEY,
-  AUTH_CLIENT_ID,
-  AUTH_LOGOUT_COMPLETE_URL,
-  LOGIN_REDIRECT_KEY,
-  LOGOUT_REDIRECT_KEY,
+  AUTH_PORTAL_CLIENT_ID,
+  AUTH_PORTAL_LOGOUT_COMPLETE_URL,
+  AUTH_PORTAL_LOGIN_COMPLETE_URL,
   NON_STAFF_CONNECTION,
 } from '../constants';
 
-export const clearFlag = () => {
-  localStorage.removeItem(LOGGED_IN_FLAG_KEY);
+const createRedirectQueryParams = ({ redirectName, redirectQueryParams }) => {
+  let queryParams = `redirectName=${redirectName}`;
+
+  if (redirectQueryParams) {
+    queryParams += `&redirectQueryParams=${encodeURIComponent(
+      JSON.stringify(redirectQueryParams)
+    )}`;
+  }
+
+  return queryParams;
 };
 
-export const setFlag = () => {
-  localStorage.setItem(LOGGED_IN_FLAG_KEY, true);
-};
+export const logIn = (info = {}) => {
+  const queryParams = createRedirectQueryParams({
+    redirectName: 'accountOverview',
+    ...info,
+  });
 
-export const logIn = () => {
-  localStorage.setItem(LOGIN_REDIRECT_KEY, window.location.href);
-  auth.authorize({ initial_screen: 'login' });
-};
-
-export const logOut = () => {
-  localStorage.setItem(LOGOUT_REDIRECT_KEY, window.location.href);
-  auth.logout({
-    clientID: AUTH_CLIENT_ID,
-    returnTo: AUTH_LOGOUT_COMPLETE_URL,
+  auth.authorize({
+    initial_screen: 'login',
+    redirectUri: `${AUTH_PORTAL_LOGIN_COMPLETE_URL}?${queryParams}`,
   });
 };
 
-export const hasLoggedInFlag = () =>
-  localStorage.getItem(LOGGED_IN_FLAG_KEY) === 'true';
+export const logOut = (info = {}) => {
+  const queryParams = createRedirectQueryParams({
+    redirectName: 'donate',
+    ...info,
+  });
 
-export const register = () => {
-  localStorage.setItem(LOGIN_REDIRECT_KEY, window.location.href);
-  auth.authorize({ initial_screen: 'signUp' });
+  auth.logout({
+    clientID: AUTH_PORTAL_CLIENT_ID,
+    returnTo: `${AUTH_PORTAL_LOGOUT_COMPLETE_URL}?${queryParams}`,
+  });
 };
 
 export const resetPassword = (email, cb) => {
   auth.changePassword({ email, connection: NON_STAFF_CONNECTION }, cb);
-};
-
-export const redirectAfterLogIn = () => {
-  const url = localStorage.getItem(LOGIN_REDIRECT_KEY) || '/account';
-  setTimeout(() => {
-    window.location.href = url;
-  }, 1800);
-};
-
-export const redirectAfterLogOut = () => {
-  const url = localStorage.getItem(LOGOUT_REDIRECT_KEY) || '/account';
-  setTimeout(() => {
-    window.location.href = url;
-  }, 1800);
 };

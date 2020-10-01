@@ -1,10 +1,10 @@
 .splash {
-  background-color: $color-sand;
+  background-color: $color-fmd-blue-dark;
   background-position-x: 50%;
-  background-image: url('../img/TT-SMD18-BG_pattern-tile-trim.png');
   background-repeat: repeat;
   padding: 0 $size-b;
   color: $color-white-pure;
+
   &--blast {
     background: $color-black-pure;
     @include mq($until: bp-m) {
@@ -20,6 +20,7 @@
   }
 
   &__headline {
+    font-size: $size-xl;
     padding-bottom: $size-l;
 
     @include mq($from: bp-m) {
@@ -35,14 +36,16 @@
     @include mq($from: bp-xl) {
       font-size: 2.75rem;
     }
-
-    @include mq($until: $animation-single-line-bp) {
-      padding-bottom: 3.5rem;
-    }
   }
 
   &__description {
     font-size: $size-b;
+    line-height: 1.5;
+
+    a {
+      color: $color-white-pure;
+      text-decoration: underline;
+    }
   }
 
   &__logo {
@@ -52,7 +55,7 @@
       max-width: 100%;
     }
   }
-  
+
   &__bug {
     img {
       max-width: 250px;

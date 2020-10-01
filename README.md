@@ -16,7 +16,7 @@ You'll also need to have an `env` file set up with the environment variables for
 and Salesforce so that Docker can find them. By default the `Makefile` will look for
 `env-docker` but this can be overridden with the `DOCKER_ENV_FILE` environment variable.
 
-You should also install [`pre-commit`](https://pre-commit.com/#install), which we use for managing Git hooks (including JS formatting via [Prettier](https://prettier.io/)). Once downloaded, run `pre-commit install` at the root of this repo. You'll also need Node version 8.
+You should also install [`pre-commit`](https://pre-commit.com/#install), which we use for managing Git hooks (including JS formatting via [Prettier](https://prettier.io/)). Once downloaded, run `pre-commit install` at the root of this repo. You'll also need Node version 12.
 
 Requirements
 ------------
@@ -27,9 +27,9 @@ Environment
 -----------
 | Variable                    |                                        Example |
 |-----------------------------|-----------------------------------------------:|
-| `AUTH0_AUDIENCE`            |                                      foobarbaz |
 | `AUTH0_DOMAIN`              |                                     domain.com |
-| `AUTH0_CLIENT_ID`           |                             stringstringstring |
+| `AUTH0_PORTAL_AUDIENCE`     |                                      foobarbaz |
+| `AUTH0_PORTAL_CLIENT_ID`    |                             stringstringstring |
 | `PUBLISHABLE_KEY`           |                                  pk_test_12345 |
 | `SECRET_KEY`                |                                  sk_test_12335 |
 | `SALESFORCE_HOST`           |                            test.salesforce.com |
@@ -65,6 +65,8 @@ Environment
 | `ENABLE_PORTAL`             |                                           True |
 | `PORTAL_API_DOMAIN`         |                            https://foo.bar/api |
 | `PORTAL_CAMPAIGN_ID`        |                             stringstringstring |
+| `RECAPTCHA_SECRET_KEY`      |                             stringstringstring |
+| `RECAPTCHA_SITE_KEY`        |                             stringstringstring |
 
 Running the Project
 -------------------
@@ -83,10 +85,10 @@ Front end
 -------------------
 The easiest way to develop is by running `make restart`. Other more granular commands:
 
-+ `yarn run js:dev`: Build JS and put Webpack in watch mode
-+ `yarn run ds-tasks-watch`: Build CSS and icons in watch mode
-+ `yarn run dev`: Run above two commands together
-+ `yarn run lint`: Run ESLint
++ `npm run js:dev`: Build JS and put Webpack in watch mode
++ `npm run ds-tasks-watch`: Build CSS and icons in watch mode
++ `npm run dev`: Run above two commands together
++ `npm run lint`: Run ESLint
 
 Running tests
 -------------

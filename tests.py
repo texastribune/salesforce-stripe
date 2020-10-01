@@ -2,11 +2,14 @@ from datetime import datetime
 from decimal import Decimal
 
 from pytz import timezone
+from wtforms import validators
 
 import pytest
 from batch import amount_to_charge
 from npsp import RDO, Contact, Opportunity, SalesforceConnection, Account
 from util import clean, construct_slack_message
+from forms import format_amount, validate_amount
+from charges import generate_stripe_description
 
 
 class SalesforceConnectionSubClass(SalesforceConnection):
@@ -15,6 +18,41 @@ class SalesforceConnectionSubClass(SalesforceConnection):
 
 
 sf = SalesforceConnectionSubClass()
+
+
+def test_generate_stripe_description():
+    # if description is blank use type
+    opp = Opportunity(sf_connection=sf)
+    opp.type = "Recurring Donation"
+    opp.description = ""
+    actual = generate_stripe_description(opp)
+    assert actual == "Texas Tribune Sustaining Membership"
+
+    # strip leading "The "
+    opp = Opportunity(sf_connection=sf)
+    opp.description = "The Cuddly Kitty"
+    actual = generate_stripe_description(opp)
+    assert actual == "Cuddly Kitty"
+
+    # description overrides type
+    opp = Opportunity(sf_connection=sf)
+    opp.type = "Recurring Donation"
+    opp.description = "Cats in Hats Are Cute!"
+    actual = generate_stripe_description(opp)
+    assert actual == "Cats in Hats Are Cute!"
+
+    # if we can't find anything else at least they'll know it's from us
+    opp = Opportunity(sf_connection=sf)
+    opp.type = "Something Bogus"
+    opp.description = ""
+    actual = generate_stripe_description(opp)
+    assert actual == "Texas Tribune"
+
+
+def test_net_amount_none():
+    opp = Opportunity(sf_connection=sf)
+    opp.net_amount = None
+    assert opp.net_amount == "0.00"
 
 
 def test__clean():
@@ -179,6 +217,7 @@ def test__format_opportunity():
     opportunity = Opportunity(sf_connection=sf)
     opportunity.account_id = "0011700000BpR8PAAV"
     opportunity.amount = 9
+    opportunity.net_amount = 8
     opportunity.encouraged_by = "Because I love the Trib!"
     opportunity.name = "D C (dcraigmile+test6@texastribune.org)"
     opportunity.stripe_id = "cus_78MqJSBejMN9gn"
@@ -211,6 +250,8 @@ def test__format_opportunity():
         "Stripe_Card_Expiration__c": None,
         "Stripe_Card_Last_4__c": None,
         "Amazon_Order_Id__c": None,
+        "Net_Amount__c": "8.00",
+        "Donor_Selected_Amount__c": 0,
     }
     assert response == expected
 
@@ -507,3 +548,77 @@ def test_amount_to_charge_just_fees_true():
     actual = amount_to_charge(opp)
     expected = Decimal("10.53")
     assert actual == expected
+
+
+def test_base_form_amount_filter_with_leading_dollar_sign():
+
+    amount = "$8.67"
+    actual = format_amount(amount)
+    expected = Decimal(8.67)
+    assert actual == expected
+
+
+def test_base_form_amount_filter_without_leading_dollar_sign():
+
+    amount = "101.91"
+    actual = format_amount(amount)
+    expected = Decimal(101.91)
+    assert actual == expected
+
+
+def test_base_form_amount_filter_with_non_numeric_value():
+
+    amount = "$89.a&4"
+    actual = format_amount(amount)
+    expected = None
+    assert actual == expected
+
+
+class Form(object):
+    pass
+
+
+class Field(object):
+    def __init__(self, value):
+        self.data = value
+
+
+def test_base_form_amount_validator_with_valid_value():
+
+    form = Form()
+    amount_field = Field(13)  # valid amount
+
+    try:
+        validate_amount(form, amount_field)
+    except:
+        raise Exception("An error was raised despite a valid amount being provided")
+
+
+def test_base_form_amount_validator_with_non_numeric_value():
+
+    form = Form()
+    # None is sent from filter func if value can't be casted to a float
+    amount_field = Field(None)
+
+    try:
+        validate_amount(form, amount_field)
+        raise Exception("A validation error should have been raised")
+    except validators.ValidationError as e:
+        assert str(e) == "Non-numeric amount provided"
+    except:
+        raise Exception("An error was raised, but not a validation one")
+
+
+def test_base_form_amount_validator_with_too_small_value():
+
+    form = Form()
+    # None is sent if value can't be casted to a float
+    amount_field = Field(0.87)
+
+    try:
+        validate_amount(form, amount_field)
+        raise Exception("A validation error should have been raised")
+    except validators.ValidationError as e:
+        assert str(e) == "Amount is less than 1"
+    except:
+        raise Exception("An error was raised, but not a validation one")
